@@ -1,0 +1,86 @@
+#!/bin/sh
+
+TMUX_SESSION_NAME=$(tmux display-message -p "#S")
+SELECTOR=$KUBECTL_PLUGINS_LOCAL_FLAG_SELECTOR
+NAMESPACE=$KUBECTL_PLUGINS_CURRENT_NAMESPACE
+
+# creates a new tmux window
+createNewTmuxWindow() {
+    tmux new-window $1
+}
+
+# ensure tmux executable exists
+ensureTmuxExists() {
+    if [ -z "$(which tmux)" ]; then
+        echo "tmux executable not found ... is it installed?"
+        exit 1
+    fi
+}
+
+# ensure desired tmux session exists, otherwise exit
+ensureTmuxSessionExists() {
+    if ! tmux ls 2> /dev/null | grep -q "${TMUX_SESSION_NAME}: "; then
+        echo "Failed to connect to tmux session."
+        exit 1
+    fi
+}
+
+# gets pod names from a name selector
+getPods() {
+    if [ -z "${SELECTOR}" ]; then
+        kubectl get pods -n ${NAMESPACE} -o name --no-headers
+    else
+        kubectl get pods -l ${SELECTOR} -n ${NAMESPACE} -o name --no-headers
+    fi
+}
+
+# switch the tmux window layout
+selectTmuxLayout() {
+    tmux select-layout $1
+}
+
+# creates a new tmux window
+splitTmuxWindow() {
+    tmux split-window $1
+}
+
+# set synchronization for current tmux window
+synchronizePanes() {
+    tmux set-window-option synchronize-panes "on"
+}
+
+# unset synchronization for current tmux window
+unsynchronizePanes() {
+    tmux set-window-option synchronize-panes "off"
+}
+
+tailContainerLogs() {
+    INDEX=0
+
+    PODS=$(getPods)
+
+    for POD in ${PODS}; do
+        KUBECTL_LOGS_COMMAND="kubectl logs -f ${POD} -n ${NAMESPACE}"
+        if [ ${INDEX} -eq 0 ]; then
+            createNewTmuxWindow "${KUBECTL_LOGS_COMMAND}"
+        else
+            splitTmuxWindow "${KUBECTL_LOGS_COMMAND}"
+            selectTmuxLayout tiled
+        fi
+        INDEX=$((INDEX+1))
+    done
+
+    if [ ${INDEX} -eq 0 ]; then
+        echo "No matching pods found!"
+    fi
+}
+
+# execute pre-command checks
+ensureTmuxExists
+ensureTmuxSessionExists
+
+# tail container logs
+tailContainerLogs
+
+# synchronize panes
+synchronizePanes
