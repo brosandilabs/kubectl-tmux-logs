@@ -1,8 +1,11 @@
 name: "tmux-logs"
 shortDesc: "tmux integration for kubectl logs"
-longDesc: "tmux-logs integrates kubectl logs with tmux by opening a new pane for each pod log"
+longDesc: "tmux-logs integrates kubectl logs with tmux by opening a new pane for each pod-container log"
 command: "./tmux-logs"
 flags:
   - name: "selector"
     shorthand: "l"
     desc: "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)"
+  - name: "container"
+    shorthand: "c"
+    desc: "Container name (for pods with multiple containers)"

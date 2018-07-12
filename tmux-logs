@@ -1,8 +1,9 @@
 #!/bin/sh
 
 TMUX_SESSION_NAME=$(tmux display-message -p "#S")
-SELECTOR=$KUBECTL_PLUGINS_LOCAL_FLAG_SELECTOR
 NAMESPACE=$KUBECTL_PLUGINS_CURRENT_NAMESPACE
+SELECTOR=$KUBECTL_PLUGINS_LOCAL_FLAG_SELECTOR
+CONTAINER=$KUBECTL_PLUGINS_LOCAL_FLAG_CONTAINER
 
 # creates a new tmux window
 createNewTmuxWindow() {
@@ -25,12 +26,18 @@ ensureTmuxSessionExists() {
     fi
 }
 
-# gets pod names from a name selector
-getPods() {
-    if [ -z "${SELECTOR}" ]; then
-        kubectl get pods -n ${NAMESPACE} -o name --no-headers
+# gets pod and container names from a name selector
+getPodContainers() {
+    if [ -z "${CONTAINER}" ]; then
+        GO_TEMPLATE="{{range .items}}{{\$name:=.metadata.name}}{{range .spec.containers}}{{print \$name}}_{{.name}} {{end}}{{end}}"
     else
-        kubectl get pods -l "${SELECTOR}" -n ${NAMESPACE} -o name --no-headers
+        GO_TEMPLATE="{{range .items}}{{\$name:=.metadata.name}}{{range .spec.containers}}{{if eq .name \"${CONTAINER}\"}}{{print \$name}}_{{.name}} {{end}}{{end}}{{end}}"
+    fi
+
+    if [ -z "${SELECTOR}" ]; then
+        kubectl get pods -n ${NAMESPACE} -o go-template --template="${GO_TEMPLATE}"
+    else
+        kubectl get pods -n ${NAMESPACE} -l "${SELECTOR}" -o go-template --template="${GO_TEMPLATE}"
     fi
 }
 
@@ -57,10 +64,11 @@ unsynchronizePanes() {
 tailContainerLogs() {
     INDEX=0
 
-    PODS=$(getPods)
+    POD_CONTAINERS=$(getPodContainers)
 
-    for POD in ${PODS}; do
-        KUBECTL_LOGS_COMMAND="kubectl logs -f ${POD} -n ${NAMESPACE}"
+    for POD_CONTAINER in ${POD_CONTAINERS}; do
+        POD_CONTAINER_SPACED="${POD_CONTAINER/_/ }"
+        KUBECTL_LOGS_COMMAND="kubectl -n ${NAMESPACE} logs -f ${POD_CONTAINER_SPACED}"
         if [ ${INDEX} -eq 0 ]; then
             createNewTmuxWindow "${KUBECTL_LOGS_COMMAND}"
         else
