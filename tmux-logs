@@ -30,7 +30,7 @@ getPods() {
     if [ -z "${SELECTOR}" ]; then
         kubectl get pods -n ${NAMESPACE} -o name --no-headers
     else
-        kubectl get pods -l ${SELECTOR} -n ${NAMESPACE} -o name --no-headers
+        kubectl get pods -l "${SELECTOR}" -n ${NAMESPACE} -o name --no-headers
     fi
 }
 
